@@ -106,10 +106,6 @@ class PracticeHubClient:
             allow_statuses={423},
         )
 
-    def list_attachments(self, post_id):
-        """Return attachment metadata for a post."""
-        return self._request("GET", f"/api/v1/posts/{post_id}/attachments").json()
-
     def download_attachment(self, attachment_id):
         """Download raw attachment bytes by attachment id."""
         return self._request("GET", f"/api/v1/attachments/{attachment_id}").content
