@@ -1,0 +1,205 @@
+[
+  {
+    "id": 34,
+    "title": "Check-in for Sept 15",
+    "body": "Daily check-in for Tuesday 15 September. Reply to this post to check in.",
+    "tags": [
+      "check-in"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T15:16:07.310656",
+    "updated_at": "2026-09-15T15:16:07.310659",
+    "attachments": []
+  },
+  {
+    "id": 33,
+    "title": "Sept 14 check-in",
+    "body": "Daily check-in for Monday 14 September. Reply to this post to check in.",
+    "tags": [
+      "check-in"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T15:16:07.158613",
+    "updated_at": "2026-09-15T15:16:07.158616",
+    "attachments": []
+  },
+  {
+    "id": 32,
+    "title": "Check-in for Sept 13",
+    "body": "Daily check-in for Sunday 13 September. Reply to this post to check in.",
+    "tags": [
+      "check-in"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T15:16:07.004517",
+    "updated_at": "2026-09-15T15:16:07.004520",
+    "attachments": []
+  },
+  {
+    "id": 31,
+    "title": "Sept 12 check-in",
+    "body": "Daily check-in for Saturday 12 September. Reply to this post to check in.",
+    "tags": [
+      "check-in"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T15:16:06.849863",
+    "updated_at": "2026-09-15T15:16:06.849866",
+    "attachments": []
+  },
+  {
+    "id": 30,
+    "title": "Check-in for Sept 11",
+    "body": "Daily check-in for Friday 11 September. Reply to this post to check in.",
+    "tags": [
+      "check-in"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T15:16:06.689547",
+    "updated_at": "2026-09-15T15:16:06.689549",
+    "attachments": []
+  },
+  {
+    "id": 29,
+    "title": "Sept 10 check-in",
+    "body": "Daily check-in for Thursday 10 September. Reply to this post to check in.",
+    "tags": [
+      "check-in"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T15:16:06.533864",
+    "updated_at": "2026-09-15T15:16:06.533867",
+    "attachments": []
+  },
+  {
+    "id": 28,
+    "title": "Check-in for Sept 9",
+    "body": "Daily check-in for Wednesday 09 September. Reply to this post to check in.",
+    "tags": [
+      "check-in"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T15:16:06.385108",
+    "updated_at": "2026-09-15T15:16:06.385111",
+    "attachments": []
+  },
+  {
+    "id": 27,
+    "title": "Sept 8 check-in",
+    "body": "Daily check-in for Tuesday 08 September. Reply to this post to check in.",
+    "tags": [
+      "check-in"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T15:16:06.218179",
+    "updated_at": "2026-09-15T15:16:06.218183",
+    "attachments": []
+  },
+  {
+    "id": 26,
+    "title": "Check-in for Sept 7",
+    "body": "Daily check-in for Monday 07 September. Reply to this post to check in.",
+    "tags": [
+      "check-in"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T15:16:06.045993",
+    "updated_at": "2026-09-15T15:16:06.046002",
+    "attachments": []
+  },
+  {
+    "id": 25,
+    "title": "Reminder: GitHub cron runs in UTC",
+    "body": "Central time is UTC-5 until 1 November.",
+    "tags": [
+      "tip"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T14:58:17.627801",
+    "updated_at": "2026-09-15T14:58:17.627810",
+    "attachments": []
+  },
+  {
+    "id": 24,
+    "title": "Week 5 Pandas notes",
+    "body": "Two files for Week 5: a one-page Pandas quick reference, and a small CSV to practise groupby and mean on before you start Mini Project 3.",
+    "tags": [
+      "week5",
+      "pandas"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T14:58:17.498189",
+    "updated_at": "2026-09-15T14:58:17.498196",
+    "attachments": [
+      {
+        "id": 2,
+        "post_id": 24,
+        "filename": "pandas_quick_reference.md",
+        "content_type": "text/markdown",
+        "size": 524,
+        "download_url": "/api/v1/attachments/2",
+        "created_at": "2026-09-15T14:58:17.536173",
+        "local_path": "artifact/files/2_pandas_quick_reference.md"
+      },
+      {
+        "id": 3,
+        "post_id": 24,
+        "filename": "sample_scores.csv",
+        "content_type": "text/csv",
+        "size": 137,
+        "download_url": "/api/v1/attachments/3",
+        "created_at": "2026-09-15T14:58:17.595744",
+        "local_path": "artifact/files/3_sample_scores.csv"
+      }
+    ]
+  },
+  {
+    "id": 23,
+    "title": "Course syllabus, Fall 2026",
+    "body": "The Fall 2026 syllabus is attached as a PDF.",
+    "tags": [
+      "syllabus"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T14:58:17.406688",
+    "updated_at": "2026-09-15T14:58:17.406696",
+    "attachments": [
+      {
+        "id": 1,
+        "post_id": 23,
+        "filename": "INF601_Syllabus_F2026.pdf",
+        "content_type": "application/pdf",
+        "size": 74928,
+        "download_url": "/api/v1/attachments/1",
+        "created_at": "2026-09-15T14:58:17.457132",
+        "local_path": "artifact/files/1_INF601_Syllabus_F2026.pdf"
+      }
+    ]
+  },
+  {
+    "id": 22,
+    "title": "Scheduled bot lab: what this feed is for",
+    "body": "This feed is where I post course material for the Scheduled Bot lab. Your bot's first job is to collect everything I publish here: every post, its full body, its tags and timestamps, and every attached file.\n\nSome posts are long, like this one, and some are a single line. Some carry one attachment, some carry several, and many carry none. A correct collector does not care which: it pages through all of my posts using the author filter, saves each body exactly as the API returns it, and downloads every file listed under attachments.\n\nYour bot's second job is to reply to my daily check-in posts while each one is open. Those are the only posts with the check-in keyword in the title. Do not reply to this post or any other regular post, and never reply to another student's post.\n\nI will add more posts over the coming days, so your artifact should grow as your schedule runs. Whatever is in your committed artifact folder at the deadline is what I grade.",
+    "tags": [
+      "lab",
+      "info"
+    ],
+    "author_id": 7,
+    "author_name": "Jason Zeller",
+    "created_at": "2026-09-15T14:58:17.356030",
+    "updated_at": "2026-09-15T14:58:17.356039",
+    "attachments": []
+  }
+]
