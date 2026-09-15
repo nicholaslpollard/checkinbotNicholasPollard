@@ -23,6 +23,10 @@ ARTIFACT_DIR = "artifact"
 FILES_DIR = os.path.join(ARTIFACT_DIR, "files")
 COLLECTED_JSON_PATH = os.path.join(ARTIFACT_DIR, "collected.json")
 
+# Text posted as a reply to each qualifying, unanswered instructor check-in.
+# Customize this freely; nothing else in the file needs to change.
+CHECKIN_REPLY_TEXT = "Checking in for today."
+
 
 class ConfigError(Exception):
     """Raised when required configuration is missing."""
@@ -43,12 +47,14 @@ def load_config():
     """Load API configuration from environment variables."""
     base_url = os.environ.get("PRACTICE_API_URL")
     token = os.environ.get("PRACTICE_API_TOKEN")
-    instructor_id = os.environ.get("INSTRUCTOR_ID", "7")
+    instructor_id = os.environ.get("INSTRUCTOR_ID")
 
     if not base_url:
         raise ConfigError("PRACTICE_API_URL environment variable is not set")
     if not token:
         raise ConfigError("PRACTICE_API_TOKEN environment variable is not set")
+    if not instructor_id:
+        raise ConfigError("INSTRUCTOR_ID environment variable is not set")
 
     try:
         instructor_id = int(instructor_id)
@@ -71,36 +77,73 @@ class PracticeHubClient:
     def _request(self, method, path, *, allow_statuses=frozenset(), **kwargs):
         url = f"{self.base_url}{path}"
         try:
-            response = self.session.request(method, url, timeout=DEFAULT_TIMEOUT, **kwargs)
-        except requests.exceptions.RequestException as exc:
-            raise PracticeHubError(f"Network error calling {method} {path}: {exc}") from exc
-
-        if response.status_code >= 400 and response.status_code not in allow_statuses:
-            raise PracticeHubError(
-                f"{method} {path} failed: HTTP {response.status_code} - {response.text[:300]}"
+            response = self.session.request(
+                method,
+                url,
+                timeout=DEFAULT_TIMEOUT,
+                **kwargs,
             )
+        except requests.exceptions.RequestException as exc:
+            raise PracticeHubError(
+                f"Network error calling {method} {path}: {exc}"
+            ) from exc
+
+        if (
+            response.status_code >= 400
+            and response.status_code not in allow_statuses
+        ):
+            raise PracticeHubError(
+                f"{method} {path} failed: HTTP {response.status_code} - "
+                f"{response.text[:300]}"
+            )
+
         return response
 
     def get_me(self):
         """Return the account that owns the configured API token."""
         return self._request("GET", "/api/v1/me").json()
 
-    def list_posts(self, *, limit=100, offset=0, author=None, tag=None, mine=False):
+    def list_posts(
+        self,
+        *,
+        limit=100,
+        offset=0,
+        author=None,
+        tag=None,
+        mine=False,
+    ):
         """Return one page of posts, newest first."""
-        params = {"limit": limit, "offset": offset, "mine": mine}
+        params = {
+            "limit": limit,
+            "offset": offset,
+            "mine": mine,
+        }
+
         if author is not None:
             params["author"] = author
+
         if tag is not None:
             params["tag"] = tag
-        return self._request("GET", "/api/v1/posts", params=params).json()
+
+        return self._request(
+            "GET",
+            "/api/v1/posts",
+            params=params,
+        ).json()
 
     def get_post(self, post_id):
         """Return the full detail record for a single post."""
-        return self._request("GET", f"/api/v1/posts/{post_id}").json()
+        return self._request(
+            "GET",
+            f"/api/v1/posts/{post_id}",
+        ).json()
 
     def list_comments(self, post_id):
         """Return all comments on a post."""
-        return self._request("GET", f"/api/v1/posts/{post_id}/comments").json()
+        return self._request(
+            "GET",
+            f"/api/v1/posts/{post_id}/comments",
+        ).json()
 
     def create_comment(self, post_id, body):
         """
@@ -116,31 +159,55 @@ class PracticeHubClient:
 
     def download_attachment(self, attachment_id):
         """Download raw attachment bytes by attachment id."""
-        return self._request("GET", f"/api/v1/attachments/{attachment_id}").content
+        return self._request(
+            "GET",
+            f"/api/v1/attachments/{attachment_id}",
+        ).content
 
 
-def fetch_instructor_posts(client, instructor_id, page_size=PAGE_SIZE):
+def fetch_instructor_posts(
+    client,
+    instructor_id,
+    page_size=PAGE_SIZE,
+):
     """
-    Page through /api/v1/posts until every page has been retrieved, returning
-    only posts authored by instructor_id.
+    Page through /api/v1/posts until every page has been retrieved,
+    returning only posts authored by instructor_id.
 
     The server already supports an "author" filter, but the result is also
     filtered client-side as a safety net against unfiltered/incorrect rows.
     """
     posts = []
     offset = 0
+
     while True:
-        page = client.list_posts(limit=page_size, offset=offset, author=instructor_id)
+        page = client.list_posts(
+            limit=page_size,
+            offset=offset,
+            author=instructor_id,
+        )
+
         if not page:
             break
-        posts.extend(post for post in page if post.get("author_id") == instructor_id)
+
+        posts.extend(
+            post
+            for post in page
+            if post.get("author_id") == instructor_id
+        )
+
         if len(page) < page_size:
             break
+
         offset += page_size
+
     return posts
 
 
-def safe_attachment_filename(attachment_id, original_filename):
+def safe_attachment_filename(
+    attachment_id,
+    original_filename,
+):
     """
     Build a filesystem-safe, collision-proof filename for an attachment.
 
@@ -150,42 +217,68 @@ def safe_attachment_filename(attachment_id, original_filename):
     """
     base = os.path.basename(original_filename or "") or "attachment"
     sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", base)
+
     return f"{attachment_id}_{sanitized}"
 
 
-def download_attachments(client, attachments, files_dir):
+def download_attachments(
+    client,
+    attachments,
+    files_dir,
+):
     """
-    Download every attachment's bytes into files_dir. Returns the attachment
-    metadata with an added "local_path" field pointing at the saved file.
+    Download every attachment's bytes into files_dir.
+
+    Returns the attachment metadata with an added "local_path" field
+    pointing at the saved file.
 
     Every instructor attachment must download successfully. A failure here
     is allowed to propagate as PracticeHubError so the whole collection run
     fails loudly instead of silently producing an incomplete artifact.
     """
     os.makedirs(files_dir, exist_ok=True)
+
     saved = []
+
     for attachment in attachments:
-        filename = safe_attachment_filename(attachment["id"], attachment["filename"])
-        local_path = os.path.join(files_dir, filename)
-        content = client.download_attachment(attachment["id"])
+        filename = safe_attachment_filename(
+            attachment["id"],
+            attachment["filename"],
+        )
+
+        local_path = os.path.join(
+            files_dir,
+            filename,
+        )
+
+        content = client.download_attachment(
+            attachment["id"]
+        )
 
         with open(local_path, "wb") as f:
             f.write(content)
 
-        saved.append({
-            "id": attachment["id"],
-            "post_id": attachment["post_id"],
-            "filename": attachment["filename"],
-            "content_type": attachment["content_type"],
-            "size": attachment["size"],
-            "download_url": attachment["download_url"],
-            "created_at": attachment["created_at"],
-            "local_path": local_path,
-        })
+        saved.append(
+            {
+                "id": attachment["id"],
+                "post_id": attachment["post_id"],
+                "filename": attachment["filename"],
+                "content_type": attachment["content_type"],
+                "size": attachment["size"],
+                "download_url": attachment["download_url"],
+                "created_at": attachment["created_at"],
+                "local_path": local_path,
+            }
+        )
+
     return saved
 
 
-def build_post_record(client, detail, files_dir):
+def build_post_record(
+    client,
+    detail,
+    files_dir,
+):
     """Build one collected.json post record from a full post detail payload."""
     return {
         "id": detail["id"],
@@ -196,41 +289,169 @@ def build_post_record(client, detail, files_dir):
         "author_name": detail["author_name"],
         "created_at": detail["created_at"],
         "updated_at": detail["updated_at"],
-        "attachments": download_attachments(client, detail.get("attachments") or [], files_dir),
+        "attachments": download_attachments(
+            client,
+            detail.get("attachments") or [],
+            files_dir,
+        ),
     }
 
 
-def collect_instructor_posts(client, instructor_id, artifact_dir=ARTIFACT_DIR):
+def collect_instructor_posts(
+    client,
+    instructor_id,
+    artifact_dir=ARTIFACT_DIR,
+):
     """
-    Collect every instructor post (full detail, tags, timestamps, downloaded
-    attachments) and write it to <artifact_dir>/collected.json.
+    Collect every instructor post with full detail, tags, timestamps,
+    and downloaded attachments.
+
+    The resulting data is written to <artifact_dir>/collected.json.
 
     Each run fetches the complete current instructor dataset and overwrites
     collected.json with it, so re-running safely refreshes the artifact
-    instead of duplicating or losing records. files_dir is cleared and
-    recreated before downloading, so a successful run leaves it containing
-    exactly the current attachment set with no stale leftover files. If any
-    attachment fails to download, the exception propagates and this run
-    exits without writing collected.json.
+    instead of duplicating or losing records.
+
+    files_dir is cleared and recreated before downloading, so a successful
+    run leaves it containing exactly the current attachment set with no stale
+    leftover files.
+
+    If any attachment fails to download, the exception propagates and the
+    run exits without writing collected.json.
     """
-    files_dir = os.path.join(artifact_dir, "files")
-    os.makedirs(artifact_dir, exist_ok=True)
+    files_dir = os.path.join(
+        artifact_dir,
+        "files",
+    )
+
+    os.makedirs(
+        artifact_dir,
+        exist_ok=True,
+    )
+
     if os.path.isdir(files_dir):
         shutil.rmtree(files_dir)
-    os.makedirs(files_dir, exist_ok=True)
 
-    summaries = fetch_instructor_posts(client, instructor_id)
+    os.makedirs(
+        files_dir,
+        exist_ok=True,
+    )
+
+    summaries = fetch_instructor_posts(
+        client,
+        instructor_id,
+    )
+
     posts = [
-        build_post_record(client, client.get_post(summary["id"]), files_dir)
+        build_post_record(
+            client,
+            client.get_post(summary["id"]),
+            files_dir,
+        )
         for summary in summaries
     ]
 
-    collected_path = os.path.join(artifact_dir, "collected.json")
-    with open(collected_path, "w", encoding="utf-8") as f:
-        json.dump(posts, f, indent=2)
+    collected_path = os.path.join(
+        artifact_dir,
+        "collected.json",
+    )
+
+    with open(
+        collected_path,
+        "w",
+        encoding="utf-8",
+    ) as f:
+        json.dump(
+            posts,
+            f,
+            indent=2,
+        )
         f.write("\n")
 
     return posts
+
+
+def is_qualifying_checkin(
+    post,
+    instructor_id,
+):
+    """
+    A post qualifies for a check-in reply only when BOTH are true:
+    it was authored by instructor_id, and "check-in" appears anywhere
+    in its title case-insensitively.
+
+    Tags, body content, exact wording, and dates are intentionally
+    never consulted.
+    """
+    return (
+        post.get("author_id") == instructor_id
+        and "check-in" in post.get("title", "").lower()
+    )
+
+
+def has_already_replied(
+    comments,
+    my_user_id,
+):
+    """True if any existing comment was authored by my_user_id."""
+    return any(
+        comment.get("author_id") == my_user_id
+        for comment in comments
+    )
+
+
+def process_checkins(
+    client,
+    posts,
+    instructor_id,
+    my_user_id,
+):
+    """
+    For every qualifying instructor check-in among posts, reply once unless
+    my_user_id has already commented.
+
+    A 423 (check-in closed) is reported and skipped rather than treated as a
+    fatal error, so the remaining posts still get processed.
+    """
+    for post in posts:
+        if not is_qualifying_checkin(
+            post,
+            instructor_id,
+        ):
+            continue
+
+        comments = client.list_comments(
+            post["id"]
+        )
+
+        if has_already_replied(
+            comments,
+            my_user_id,
+        ):
+            print(
+                f"Already replied to check-in {post['id']}; skipping."
+            )
+            continue
+
+        response = client.create_comment(
+            post["id"],
+            CHECKIN_REPLY_TEXT,
+        )
+
+        if response.status_code == 423:
+            print(
+                f"Check-in {post['id']} "
+                f"('{post['title']}') is not currently "
+                f"accepting replies (423 Locked); skipping."
+            )
+            continue
+
+        comment = response.json()
+
+        print(
+            f"Posted check-in reply on post {post['id']} "
+            f"(comment id={comment.get('id')})."
+        )
 
 
 def main():
@@ -238,10 +459,35 @@ def main():
     client = PracticeHubClient(config)
 
     me = client.get_me()
-    print(f"Authenticated as: {me['name']} (id={me['id']})")
 
-    posts = collect_instructor_posts(client, config.instructor_id)
-    print(f"Collected {len(posts)} instructor post(s) into {COLLECTED_JSON_PATH}")
+    print(
+        f"Authenticated as: {me['name']} "
+        f"(id={me['id']})"
+    )
+
+    # Check-ins are time-sensitive and cannot be recovered after their
+    # daily window closes, so process them before full artifact collection.
+    post_summaries = fetch_instructor_posts(
+        client,
+        config.instructor_id,
+    )
+
+    process_checkins(
+        client,
+        post_summaries,
+        config.instructor_id,
+        me["id"],
+    )
+
+    posts = collect_instructor_posts(
+        client,
+        config.instructor_id,
+    )
+
+    print(
+        f"Collected {len(posts)} instructor post(s) "
+        f"into {COLLECTED_JSON_PATH}"
+    )
 
 
 if __name__ == "__main__":
