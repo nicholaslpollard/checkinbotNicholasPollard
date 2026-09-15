@@ -210,11 +210,12 @@ class DownloadAttachmentsTests(unittest.TestCase):
             with open(saved[1]["local_path"], "rb") as f:
                 self.assertEqual(f.read(), b"second")
 
-    def test_failed_download_is_skipped_not_fatal(self):
+    def test_failed_download_raises_instead_of_skipping(self):
         attachments = [
             {"id": 1, "post_id": 1, "filename": "ok.pdf", "content_type": "application/pdf",
              "size": 3, "download_url": "u1", "created_at": "t"},
         ]
+
         class RaisingClient(FakeClient):
             def download_attachment(self, attachment_id):
                 raise PracticeHubError("boom")
@@ -222,8 +223,8 @@ class DownloadAttachmentsTests(unittest.TestCase):
         raising_client = RaisingClient(pages=[], post_details={})
         with tempfile.TemporaryDirectory() as tmp:
             files_dir = os.path.join(tmp, "files")
-            saved = download_attachments(raising_client, attachments, files_dir)
-        self.assertEqual(saved, [])
+            with self.assertRaises(PracticeHubError):
+                download_attachments(raising_client, attachments, files_dir)
 
 
 class CollectInstructorPostsTests(unittest.TestCase):
@@ -265,6 +266,49 @@ class CollectInstructorPostsTests(unittest.TestCase):
             self.assertEqual(first_run, second_run)
             data = json.loads(second_run)
             self.assertEqual(len(data), 1)
+
+    def test_successful_refresh_removes_stale_files(self):
+        summary = make_post(1, 7)
+        current_attachment = {
+            "id": 2, "post_id": 1, "filename": "current.pdf", "content_type": "application/pdf",
+            "size": 3, "download_url": "u2", "created_at": "t",
+        }
+        detail = make_post(1, 7, attachments=[current_attachment])
+        client = FakeClient(pages=[[summary]], post_details={1: detail}, attachment_bytes={2: b"new"})
+
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact_dir = os.path.join(tmp, "artifact")
+            files_dir = os.path.join(artifact_dir, "files")
+            os.makedirs(files_dir)
+            stale_path = os.path.join(files_dir, "1_old-removed-attachment.pdf")
+            with open(stale_path, "wb") as f:
+                f.write(b"stale")
+
+            collect_instructor_posts(client, instructor_id=7, artifact_dir=artifact_dir)
+
+            self.assertFalse(os.path.exists(stale_path))
+            self.assertEqual(os.listdir(files_dir), ["2_current.pdf"])
+
+    def test_attachment_failure_propagates_and_does_not_produce_success(self):
+        summary = make_post(1, 7)
+        failing_attachment = {
+            "id": 9, "post_id": 1, "filename": "broken.pdf", "content_type": "application/pdf",
+            "size": 3, "download_url": "u9", "created_at": "t",
+        }
+        detail = make_post(1, 7, attachments=[failing_attachment])
+
+        class RaisingClient(FakeClient):
+            def download_attachment(self, attachment_id):
+                raise PracticeHubError("boom")
+
+        client = RaisingClient(pages=[[summary]], post_details={1: detail})
+
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact_dir = os.path.join(tmp, "artifact")
+            with self.assertRaises(PracticeHubError):
+                collect_instructor_posts(client, instructor_id=7, artifact_dir=artifact_dir)
+
+            self.assertFalse(os.path.exists(os.path.join(artifact_dir, "collected.json")))
 
 
 if __name__ == "__main__":

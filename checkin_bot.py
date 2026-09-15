@@ -12,6 +12,7 @@ https://practice.fhsucyber.com/openapi.json before writing this file.
 import json
 import os
 import re
+import shutil
 
 import requests
 
@@ -156,20 +157,17 @@ def download_attachments(client, attachments, files_dir):
     """
     Download every attachment's bytes into files_dir. Returns the attachment
     metadata with an added "local_path" field pointing at the saved file.
-    A single failed download is logged and skipped rather than aborting the
-    whole collection run.
+
+    Every instructor attachment must download successfully. A failure here
+    is allowed to propagate as PracticeHubError so the whole collection run
+    fails loudly instead of silently producing an incomplete artifact.
     """
     os.makedirs(files_dir, exist_ok=True)
     saved = []
     for attachment in attachments:
         filename = safe_attachment_filename(attachment["id"], attachment["filename"])
         local_path = os.path.join(files_dir, filename)
-        try:
-            content = client.download_attachment(attachment["id"])
-        except PracticeHubError as exc:
-            print(f"WARNING: could not download attachment {attachment['id']} "
-                  f"({attachment['filename']}): {exc}")
-            continue
+        content = client.download_attachment(attachment["id"])
 
         with open(local_path, "wb") as f:
             f.write(content)
@@ -209,10 +207,16 @@ def collect_instructor_posts(client, instructor_id, artifact_dir=ARTIFACT_DIR):
 
     Each run fetches the complete current instructor dataset and overwrites
     collected.json with it, so re-running safely refreshes the artifact
-    instead of duplicating or losing records.
+    instead of duplicating or losing records. files_dir is cleared and
+    recreated before downloading, so a successful run leaves it containing
+    exactly the current attachment set with no stale leftover files. If any
+    attachment fails to download, the exception propagates and this run
+    exits without writing collected.json.
     """
     files_dir = os.path.join(artifact_dir, "files")
     os.makedirs(artifact_dir, exist_ok=True)
+    if os.path.isdir(files_dir):
+        shutil.rmtree(files_dir)
     os.makedirs(files_dir, exist_ok=True)
 
     summaries = fetch_instructor_posts(client, instructor_id)
