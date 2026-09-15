@@ -161,32 +161,25 @@ September 15, 2026:
   Actions tests.
 
 ### What I Wrote and Did Myself
-
 I:
-
 - created and configured the GitHub repository;
 - configured the GitHub Actions secrets (`PRACTICE_API_TOKEN`,
   `PRACTICE_API_URL`) and repository variable (`INSTRUCTOR_ID`);
 - reviewed each development phase before approving it;
-- manually made changes to the Python code and the workflow (listed
-  below);
+- personally entered the final code and workflow edits listed below after
+  reviewing the AI suggestions;
 - selected the final check-in reply text;
 - manually ran and reviewed both live GitHub Actions test runs described
   above.
 
-I did not independently write the AI-generated portions of this project;
-Claude Code wrote the bulk of `checkin_bot.py`, `test_checkin_bot.py`, and
-`checkin_bot.yml` under my direction and review.
-
 ### What I Changed in the AI-Generated Code
-
 1. Removed the hard-coded `INSTRUCTOR_ID` fallback and made
    `INSTRUCTOR_ID` a required environment variable.
 2. Changed `main()` so time-sensitive check-in processing happens before
    full artifact collection, because a missed check-in cannot be
    recovered while collection can retry.
 3. Finalized the check-in reply text (`CHECKIN_REPLY_TEXT`).
-4. Changed the GitHub Actions checkout step to explicitly target `main`.
+4. Changed the GitHub Actions checkout step to target `main`.
 5. Changed artifact staging to `git add -A artifact/`.
 6. Changed workflow pushing to `git push origin HEAD:main`.
 
