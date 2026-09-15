@@ -9,11 +9,18 @@ Verified against the live OpenAPI schema at
 https://practice.fhsucyber.com/openapi.json before writing this file.
 """
 
+import json
 import os
+import re
 
 import requests
 
 DEFAULT_TIMEOUT = 15  # seconds
+PAGE_SIZE = 100  # matches the API's documented max "limit"
+
+ARTIFACT_DIR = "artifact"
+FILES_DIR = os.path.join(ARTIFACT_DIR, "files")
+COLLECTED_JSON_PATH = os.path.join(ARTIFACT_DIR, "collected.json")
 
 
 class ConfigError(Exception):
@@ -110,18 +117,116 @@ class PracticeHubClient:
         """Download raw attachment bytes by attachment id."""
         return self._request("GET", f"/api/v1/attachments/{attachment_id}").content
 
-    def download_attachment_from_url(self, download_url):
-        """Download raw attachment bytes using the download_url from AttachmentPublic."""
-        if download_url.startswith("http"):
-            url = download_url
-        else:
-            url = f"{self.base_url}{download_url}"
-        response = self.session.get(url, timeout=DEFAULT_TIMEOUT)
-        if response.status_code >= 400:
-            raise PracticeHubError(
-                f"GET {download_url} failed: HTTP {response.status_code} - {response.text[:300]}"
-            )
-        return response.content
+
+def fetch_instructor_posts(client, instructor_id, page_size=PAGE_SIZE):
+    """
+    Page through /api/v1/posts until every page has been retrieved, returning
+    only posts authored by instructor_id.
+
+    The server already supports an "author" filter, but the result is also
+    filtered client-side as a safety net against unfiltered/incorrect rows.
+    """
+    posts = []
+    offset = 0
+    while True:
+        page = client.list_posts(limit=page_size, offset=offset, author=instructor_id)
+        if not page:
+            break
+        posts.extend(post for post in page if post.get("author_id") == instructor_id)
+        if len(page) < page_size:
+            break
+        offset += page_size
+    return posts
+
+
+def safe_attachment_filename(attachment_id, original_filename):
+    """
+    Build a filesystem-safe, collision-proof filename for an attachment.
+
+    Attachment ids are unique per the API schema, so prefixing with the id
+    guarantees no two attachments ever collide on disk, even when they share
+    an original filename, while keeping the name deterministic across runs.
+    """
+    base = os.path.basename(original_filename or "") or "attachment"
+    sanitized = re.sub(r"[^A-Za-z0-9._-]", "_", base)
+    return f"{attachment_id}_{sanitized}"
+
+
+def download_attachments(client, attachments, files_dir):
+    """
+    Download every attachment's bytes into files_dir. Returns the attachment
+    metadata with an added "local_path" field pointing at the saved file.
+    A single failed download is logged and skipped rather than aborting the
+    whole collection run.
+    """
+    os.makedirs(files_dir, exist_ok=True)
+    saved = []
+    for attachment in attachments:
+        filename = safe_attachment_filename(attachment["id"], attachment["filename"])
+        local_path = os.path.join(files_dir, filename)
+        try:
+            content = client.download_attachment(attachment["id"])
+        except PracticeHubError as exc:
+            print(f"WARNING: could not download attachment {attachment['id']} "
+                  f"({attachment['filename']}): {exc}")
+            continue
+
+        with open(local_path, "wb") as f:
+            f.write(content)
+
+        saved.append({
+            "id": attachment["id"],
+            "post_id": attachment["post_id"],
+            "filename": attachment["filename"],
+            "content_type": attachment["content_type"],
+            "size": attachment["size"],
+            "download_url": attachment["download_url"],
+            "created_at": attachment["created_at"],
+            "local_path": local_path,
+        })
+    return saved
+
+
+def build_post_record(client, detail, files_dir):
+    """Build one collected.json post record from a full post detail payload."""
+    return {
+        "id": detail["id"],
+        "title": detail["title"],
+        "body": detail["body"],
+        "tags": detail.get("tags", []),
+        "author_id": detail["author_id"],
+        "author_name": detail["author_name"],
+        "created_at": detail["created_at"],
+        "updated_at": detail["updated_at"],
+        "attachments": download_attachments(client, detail.get("attachments") or [], files_dir),
+    }
+
+
+def collect_instructor_posts(client, instructor_id, artifact_dir=ARTIFACT_DIR):
+    """
+    Collect every instructor post (full detail, tags, timestamps, downloaded
+    attachments) and write it to <artifact_dir>/collected.json.
+
+    Each run fetches the complete current instructor dataset and overwrites
+    collected.json with it, so re-running safely refreshes the artifact
+    instead of duplicating or losing records.
+    """
+    files_dir = os.path.join(artifact_dir, "files")
+    os.makedirs(artifact_dir, exist_ok=True)
+    os.makedirs(files_dir, exist_ok=True)
+
+    summaries = fetch_instructor_posts(client, instructor_id)
+    posts = [
+        build_post_record(client, client.get_post(summary["id"]), files_dir)
+        for summary in summaries
+    ]
+
+    collected_path = os.path.join(artifact_dir, "collected.json")
+    with open(collected_path, "w", encoding="utf-8") as f:
+        json.dump(posts, f, indent=2)
+        f.write("\n")
+
+    return posts
 
 
 def main():
@@ -131,8 +236,8 @@ def main():
     me = client.get_me()
     print(f"Authenticated as: {me['name']} (id={me['id']})")
 
-    posts = client.list_posts(limit=5)
-    print(f"Fetched {len(posts)} post(s) from the first page of /api/v1/posts.")
+    posts = collect_instructor_posts(client, config.instructor_id)
+    print(f"Collected {len(posts)} instructor post(s) into {COLLECTED_JSON_PATH}")
 
 
 if __name__ == "__main__":
