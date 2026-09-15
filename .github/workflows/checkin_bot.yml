@@ -1,0 +1,49 @@
+name: Scheduled Check-In Bot
+
+on:
+  schedule:
+    - cron: "0 14,18,22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Ensure only one run writes to artifact/ at a time; later runs queue
+# instead of racing a concurrent commit/push.
+concurrency:
+  group: checkin-bot
+  cancel-in-progress: false
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run check-in bot
+        env:
+          PRACTICE_API_TOKEN: ${{ secrets.PRACTICE_API_TOKEN }}
+          PRACTICE_API_URL: ${{ secrets.PRACTICE_API_URL }}
+          INSTRUCTOR_ID: ${{ vars.INSTRUCTOR_ID }}
+        run: python checkin_bot.py
+
+      - name: Commit and push artifact changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add artifact/
+          if git diff --cached --quiet; then
+            echo "No artifact changes to commit."
+          else
+            git commit -m "Update collected artifact [skip ci]"
+            git push
+          fi
